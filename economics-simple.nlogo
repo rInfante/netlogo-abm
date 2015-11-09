@@ -275,7 +275,6 @@ end
 to fire-employee
    if fired-employee != nobody 
       [
-        show sentence "FIRED " who
         let connection-to-fired-employee in-employee-from fired-employee
         if connection-to-fired-employee != nobody
            [ask connection-to-fired-employee [ die ]]
@@ -296,10 +295,7 @@ to evolve-price-lower-upper-limits
 end
 
 to evolve-num-consecutive-months-with-all-positions-filled
-  show "INCREASE CON MONTH"
-  show num-consecutive-months-all-work-positions-filled
   set num-consecutive-months-all-work-positions-filled (increment num-consecutive-months-all-work-positions-filled)
-  show num-consecutive-months-all-work-positions-filled
   ;;this is reset to 0 only one employee is fired
 end
 
@@ -705,7 +701,7 @@ number-of-firms
 number-of-firms
 0
 100
-15
+100
 1
 1
 NIL
@@ -754,7 +750,7 @@ average-reservation-wage-rate-h
 average-reservation-wage-rate-h
 300
 3000
-500
+1200
 50
 1
 NIL
@@ -769,7 +765,7 @@ average-liquidity-h
 average-liquidity-h
 1
 10000
-601
+201
 100
 1
 NIL
@@ -782,10 +778,10 @@ SLIDER
 46
 average-inventory-f
 average-inventory-f
-500
+50
 5000
-500
-100
+50
+10
 1
 NIL
 HORIZONTAL
@@ -799,7 +795,7 @@ average-liquidity-f
 average-liquidity-f
 1000
 200000
-14900
+12400
 100
 1
 NIL
@@ -814,7 +810,7 @@ average-wage-rate-f
 average-wage-rate-f
 300
 2000
-500
+1000
 10
 1
 NIL
@@ -829,7 +825,7 @@ average-price-f
 average-price-f
 10
 200
-50
+10
 10
 1
 NIL
@@ -859,7 +855,7 @@ days-in-one-month
 days-in-one-month
 20
 31
-20
+21
 1
 1
 NIL
