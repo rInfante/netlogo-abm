@@ -10,8 +10,6 @@ households-own
     reservation-wage-rate-h ;;w_h
     liquidity-h             ;;m_h
     planned-monthly-consumption-expenditure ;;c_r_h
-    ;;provider-firms          ;;type A firms//REMOVE??
-    ;;employer                ;;type B firm //REMOVE?? 
 ]
 
 firms-own
@@ -28,8 +26,6 @@ firms-own
     fired-employee
     monthly-demand-of-consumption-goods
     monthly-marginal-costs    
-    ;;employee-ids //REMOVE??
-    ;;employees //REMOVE??
     inventory-lower-limit
     inventory-upper-limit 
     price-lower-limit
@@ -132,7 +128,7 @@ to setup-firms
 end
 
 ;;;
-;;; households setup procedures
+;;; HOUSEHOLD setup procedures
 ;;;
 
 to assign-reservation-wage-rate-h
@@ -154,7 +150,6 @@ to assign-provider-firms ;TOO links!!!
        let firms-count count firms
        if number-of-provider-firms > firms-count
           [set number-of-provider-firms firms-count]
-       ;;set provider-firms n-of number-of-provider-firms firms;;TODO: REMOVE 
        create-provider-firms-to n-of number-of-provider-firms firms
      ]  
 end
@@ -163,13 +158,12 @@ end
 to assign-employees 
   ask households 
      [
-       ;;set employer one-of firms;;TODO: REMOVE
        create-employee-to one-of firms
      ]  
 end
 
 ;;;
-;;; firm setup procedures
+;;; FIRM setup procedures
 ;;;
 
 to assign-inventory-f
@@ -231,7 +225,6 @@ to evolve-first-day-of-month
       fire-employee
       evolve-inventory-lower-upper-limits
       evolve-price-lower-upper-limits
-      ;;evolve-employees;;TODO replace with links//REMOVE??
       evolve-num-consecutive-months-with-all-positions-filled
       evolve-wage-rate
       evolve-work-positions
@@ -254,7 +247,10 @@ to evolve-last-day-of-month
     [
       evolve-liquidity-from-paying-salaries
     ]
-  ask households []
+  ask households 
+    [
+      evolve-claimed-wage-rate
+    ]
 end
 
 ;;
@@ -264,9 +260,6 @@ end
 to evolve-normal-day
   ask firms 
     [    
-      ;;CHECK IF NEED THIS: evolve-inventory-lower-upper-limits  
-      ;;CHECK IF NEED THIS: evolve-price-lower-upper-limits  
-      ;;CHECK IF NEED THIS: evolve-employees
       evolve-inventory
     ]
   ask households 
@@ -398,7 +391,7 @@ to-report choose-unconnected-firm-randomly-weighted-on-employee-count
 end
 
 to evolve-employer
-  let employer one-of out-employee-neighbors
+  let employer get-employer
   ifelse employer = nobody 
      [try-set-new-employer max-number-potential-employers-visited] ;;unemployed
      [
@@ -411,6 +404,10 @@ to evolve-employer
                 [try-set-new-employer 1]        
           ]
      ]
+end
+
+to-report get-employer
+  report one-of out-employee-neighbors
 end
 
 to try-set-new-employer [n-tries]
@@ -465,29 +462,46 @@ to try-to-transact-with-provider-firms
 end
 
 to transact-with-provider-firm [n-tries planned-daily-consumption-demand]
-  let i n-tries
+  let i 0
   let liquidity-h-set? false
-  while [i > 0 and not liquidity-h-set?]
+  let current-liquidity-h liquidity-h
+  while [i < n-tries and not liquidity-h-set?]
      [
        let chosen-provider-firm one-of out-provider-firm-neighbors  
        let chosen-provider-firm-inventory [inventory-f] of chosen-provider-firm
-       let chosen-provider-firm-price [price-f] of chosen-provider-firm  
+       let chosen-provider-firm-price [price-f] of chosen-provider-firm
+       let chosen-provider-firm-liquidity [liquidity-f] of chosen-provider-firm  
        ifelse chosen-provider-firm-inventory > planned-daily-consumption-demand
-          and (liquidity-h >= chosen-provider-firm-price * planned-daily-consumption-demand)
+          and (current-liquidity-h >= chosen-provider-firm-price * planned-daily-consumption-demand)
           [
             let puchase-cost [buy-goods planned-daily-consumption-demand] of chosen-provider-firm
-            set liquidity-h (liquidity-h - puchase-cost)
+            set liquidity-h (current-liquidity-h - puchase-cost)
             set liquidity-h-set? true
           ]
           [
-            ifelse liquidity-h < chosen-provider-firm-price * planned-daily-consumption-demand
+            ifelse current-liquidity-h < chosen-provider-firm-price * planned-daily-consumption-demand
             [
-              let adjusted-daily-consumption-demand div floor (liquidity-h) floor (chosen-provider-firm-price)
+              let adjusted-daily-consumption-demand div floor (current-liquidity-h) floor (chosen-provider-firm-price)
+              let puchase-cost [buy-goods adjusted-daily-consumption-demand] of chosen-provider-firm
+              set liquidity-h (current-liquidity-h - puchase-cost)
+              set liquidity-h-set? true
             ]
             [
+              let adjusted-daily-consumption-demand chosen-provider-firm-inventory
+              let puchase-cost [buy-goods adjusted-daily-consumption-demand] of chosen-provider-firm
+              let amended-liquidity-h (current-liquidity-h - puchase-cost)
+              ifelse (i < n-tries) and (current-liquidity-h > 0.05 *  chosen-provider-firm-liquidity)
+              [
+                set current-liquidity-h amended-liquidity-h
+              ]
+              [
+                set liquidity-h amended-liquidity-h
+                set liquidity-h-set? true
+              ]
+              
             ]
           ] 
-       set i (i - 1)     
+       set i (i + 1)     
      ]  
 end
 
@@ -517,8 +531,22 @@ to pay-salary [s] ;;salary
   set liquidity-h liquidity-h + s
 end
 
+to evolve-claimed-wage-rate
+  let employer get-employer
+  ifelse employer = nobody
+  [
+    set reservation-wage-rate-h (1.0 - claimed-wage-rate-percentage-reduction-if-unemployed) * reservation-wage-rate-h
+  ]
+  [
+    let firm-wage-rate [wage-rate-f] of employer
+    if firm-wage-rate > reservation-wage-rate-h
+      [set reservation-wage-rate-h firm-wage-rate]        
+  ]
+end
+
+
 ;;
-;; common go procedures
+;; COMMON go procedures
 ;;
 
 to-report is-first-day-of-month? [days]
@@ -601,8 +629,8 @@ GRAPHICS-WINDOW
 16
 -16
 16
-0
-0
+1
+1
 1
 ticks
 30.0
