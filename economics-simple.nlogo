@@ -260,8 +260,8 @@ to evolve-last-day-of-month
       evolve-claimed-wage-rate
     ]
     
-  file-open "c:\\temp\\unemployment-figures1.txt"
-  file-write (count households with [get-employer = nobody]) file-write "," file-print (count firms with [work-position-has-been-offered? = true])
+  file-open "c:\\temp\\unemployment-figures.txt"
+  file-write (count firms with [work-position-has-been-offered? = true]) file-write "," file-print (count households with [get-employer = nobody]) 
   file-flush
 end
 
@@ -338,7 +338,7 @@ end
 to evolve-fired-employee
   ifelse not any? my-in-employees
      [set fired-employee nobody]
-     [ifelse inventory-f >= inventory-upper-limit
+     [ifelse inventory-f >= inventory-upper-limit and (count my-in-employees) > 1 ;; we do not fire the last employee
         [
            set fired-employee one-of in-employee-neighbors
         ]
@@ -568,7 +568,7 @@ to buy-goods [purchase-quantity purchase-cost chosen-provider-firm]
     [      
       set inventory-f floor-to-zero (decrease-by-amount inventory-f purchase-quantity)
       set monthly-demand-of-consumption-goods (increase-by-amount monthly-demand-of-consumption-goods purchase-quantity)
-      set liquidity-f floor-to-zero (increase-by-amount liquidity-f purchase-cost)              
+      set liquidity-f (increase-by-amount liquidity-f purchase-cost)              
     ]
 end
 
@@ -597,7 +597,7 @@ end
 ;;
 
 to pay-salary [s] ;;salary
-  set liquidity-h floor-to-zero (increase-by-amount liquidity-h s)
+  set liquidity-h (increase-by-amount liquidity-h s)
 end
 
 to evolve-claimed-wage-rate
