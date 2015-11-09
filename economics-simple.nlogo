@@ -1,13 +1,15 @@
 breed [households household]
 breed [firms firm]
+directed-link-breed [provider-firms provider-firm];;type A links
+directed-link-breed [employees employee];;type B links 
 
 households-own
 [
     reservation-wage-rate-h ;;w_h
     liquidity-h             ;;m_h
     planned-monthly-consumption-expenditure ;;c_r_h
-    provider-firms          ;;type A firms
-    employer                ;;type B firm  
+    ;;provider-firms          ;;type A firms//REMOVE??
+    ;;employer                ;;type B firm //REMOVE?? 
 ]
 
 firms-own
@@ -25,7 +27,7 @@ firms-own
     monthly-demand-of-consumption-goods
     monthly-marginal-costs    
     ;;employee-ids //REMOVE??
-    employees
+    ;;employees //REMOVE??
     inventory-lower-limit
     inventory-upper-limit 
     price-lower-limit
@@ -65,7 +67,7 @@ to setup
   setup-firms 
   
   assign-provider-firms
-  assign-employers  
+  assign-employees  
   
   reset-ticks
 end
@@ -99,7 +101,7 @@ to setup-households
        assign-reservation-wage-rate-h
        assign-liquidity-h
        assign-planned-monthly-consumption-expenditure
-       set employer nobody
+       ;;set employer nobody
      ]
 end
 
@@ -143,20 +145,25 @@ to assign-planned-monthly-consumption-expenditure
   set planned-monthly-consumption-expenditure random-near average-planned-monthly-consumption-expenditure
 end
 
-to assign-provider-firms
+to assign-provider-firms ;TOO links!!!
   ask households
      [
        let number-of-provider-firms random-near average-number-of-provider-firms
        let firms-count count firms
        if number-of-provider-firms > firms-count
           [set number-of-provider-firms firms-count]
-       set provider-firms n-of number-of-provider-firms firms 
+       ;;set provider-firms n-of number-of-provider-firms firms;;TODO: REMOVE 
+       create-provider-firms-to n-of number-of-provider-firms firms
      ]  
 end
 
 
-to assign-employers 
-  ask households [set employer one-of firms]  
+to assign-employees 
+  ask households 
+     [
+       ;;set employer one-of firms;;TODO: REMOVE
+       create-employee-to one-of firms
+     ]  
 end
 
 ;;;
@@ -219,13 +226,14 @@ end
 to evolve-first-day-of-month
   ask firms 
     [
+      fire-employee
       evolve-inventory-lower-upper-limits
       evolve-price-lower-upper-limits
-      evolve-employees
+      ;;evolve-employees;;TODO replace with links//REMOVE??
       evolve-num-consecutive-months-with-all-positions-filled
       evolve-wage-rate
       evolve-work-positions
-      evolve-goods-price
+      evolve-goods-price    
       
       evolve-monthly-demand-of-consumption-goods
       evolve-monthly-marginal-costs
@@ -235,7 +243,10 @@ end
 
 
 to evolve-last-day-of-month
-  ask firms []
+  ask firms 
+    [
+      evolve-liquidity-from-paying-salaries
+    ]
   ask households []
 end
 
@@ -258,6 +269,13 @@ end
 ;; firm first-day-of-month
 ;;
 
+to fire-employee
+   if fired-employee != nobody 
+      [
+        ask in-employee-from fired-employee [ die ]
+      ] 
+end
+
 to evolve-inventory-lower-upper-limits
   set inventory-lower-limit inventory-lower-limit-ratio * monthly-demand-of-consumption-goods
   set inventory-upper-limit inventory-upper-limit-ratio * monthly-demand-of-consumption-goods
@@ -268,9 +286,10 @@ to evolve-price-lower-upper-limits
   set price-upper-limit price-upper-limit-ratio * monthly-marginal-costs  
 end
 
-to evolve-employees
-  set employees households with [employer = myself]
-end
+;;TODO: REMOVE
+;;to evolve-employees;; TODO replace with links
+;;  set employees households with [employer = myself]
+;;end
 
 to evolve-num-consecutive-months-with-all-positions-filled
   if num-work-positions-filled = num-work-positions-available 
@@ -298,13 +317,15 @@ to evolve-work-position-has-been-offered
 end
 
 to evolve-fired-employee
-  ifelse not any? employees  
+  ifelse not any? my-in-employees
      [set fired-employee nobody]
      [ifelse inventory-f > inventory-upper-limit
         [
-           set fired-employee one-of employees
-           set employees remove fired-employee employees
-           ask fired-employee [set employer nobody]
+           set fired-employee one-of in-employee-neighbors
+           ;;set employees remove fired-employee employees//REMOVE
+           ;;ask fired-employee [set employer nobody]//REMOVE
+           
+           ;;TODO actually fire this employee in one month time
         ]
         [set fired-employee nobody] 
      ]
@@ -315,8 +336,7 @@ to evolve-num-work-positions
      [set num-work-positions-available num-work-positions-available + 1]
      [if inventory-f > inventory-upper-limit
         [
-           set num-work-positions-available num-work-positions-available - 1
-           ;;must sack employee after one month
+           set num-work-positions-available floor-to-zero (num-work-positions-available - 1)
         ]
      ]  
 end
@@ -344,7 +364,7 @@ end
 ;;
 
 to evolve-inventory
-  set inventory-f inventory-f + technology-productivity-parameter * (count employees)
+  set inventory-f inventory-f + technology-productivity-parameter * (count my-in-employees)
 end
 
 to-report buy-goods [q] ;;quantity
@@ -352,6 +372,32 @@ to-report buy-goods [q] ;;quantity
   set inventory-f inventory-f - q
   set liquidity-f liquidity-f + purchase-cost
   report purchase-cost
+end
+
+;;
+;; firm last-day-of-month
+;;
+
+to evolve-liquidity-from-paying-salaries
+  let paid-salaries (count  my-in-employees) * wage-rate-f
+  let salary wage-rate-f
+  ask in-employee-neighbors [pay-salary salary]
+  
+  if (count employees) > 0
+  [
+    let pnl liquidity-f - paid-salaries
+    let employee-pnl pnl / (count employees)
+    ask in-employee-neighbors [pay-salary employee-pnl] ;;TODO: ACTUALLY must redistribute pnl not equally to all employees, but proportionally to their liquidity
+  ]
+  set liquidity-f 0.0
+end
+
+;;
+;; household last-day-of-month
+;;
+
+to pay-salary [s] ;;salary
+  set liquidity-h liquidity-h + s
 end
 
 ;;
@@ -388,6 +434,10 @@ to-report decrease-with-probability [p v f] ;; probability, value, factor
     [report decrease v f]
     [report v]
 end   
+
+to-report floor-to-zero [v]
+  ifelse v < 0 [report 0][report v]
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 210
