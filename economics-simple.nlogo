@@ -349,10 +349,10 @@ end
 to evolve-goods-price
    let ni random-float price-growth-rate-uniform-distribution-upper-support
    ifelse inventory-f <= inventory-lower-limit
-      [if price-f <= price-upper-limit
-         [set price-f increase-with-probability probability-of-setting-new-price price-f ni]]
-      [if price-f >= price-lower-limit
-         [set price-f decrease-with-probability probability-of-setting-new-price price-f ni]]   
+      [if price-f < price-upper-limit
+         [set price-f (increase-with-probability probability-of-setting-new-price price-f ni)]]
+      [if price-f > price-lower-limit
+         [set price-f (decrease-with-probability probability-of-setting-new-price price-f ni)]]   
 end
 
 to evolve-monthly-demand-of-consumption-goods
@@ -361,7 +361,7 @@ end
 
 to evolve-marginal-costs
   if monthly-demand-of-consumption-goods > 0
-    [set marginal-cost ((count my-in-employees) * wage-rate-f) / monthly-demand-of-consumption-goods]
+    [set marginal-cost (((count my-in-employees) * wage-rate-f) / monthly-demand-of-consumption-goods)]
 end
 
 
@@ -883,8 +883,8 @@ average-price-f
 average-price-f
 10
 200
-30
-10
+15
+5
 1
 NIL
 HORIZONTAL
@@ -1103,10 +1103,10 @@ PENS
 "default" 1.0 0 -16777216 true "" "plot (count households with [get-employer = nobody])/(count households) * 100"
 
 MONITOR
-812
-245
-996
-290
+673
+339
+857
+384
 mean-unsatisfactory-providers
 mean [table:length firms-with-unsatisfied-demand-table ] of households
 17
@@ -1142,6 +1142,39 @@ MONITOR
 288
 mean-marginal-cost
 mean [marginal-cost] of firms
+17
+1
+11
+
+MONITOR
+1209
+299
+1343
+344
+mean-num-employees
+mean [count my-in-employees] of firms
+17
+1
+11
+
+MONITOR
+1353
+299
+1463
+344
+mean-num-clients
+mean [count my-in-provider-firms] of firms
+17
+1
+11
+
+MONITOR
+859
+339
+986
+384
+mean-num-providers
+mean [count my-out-provider-firms] of households
 17
 1
 11
