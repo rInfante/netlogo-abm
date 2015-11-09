@@ -9,6 +9,7 @@ households-own
 [
     reservation-wage-rate-h ;;w_h
     liquidity-h             ;;m_h
+    
     planned-monthly-consumption-expenditure ;;c_r_h
 ]
 
@@ -18,6 +19,7 @@ firms-own
     liquidity-f    ;;m_f
     wage-rate-f    ;;w_f
     price-f        ;;p_f
+    
     num-work-positions-available 
     num-work-positions-filled
     work-position-has-been-offered?
@@ -99,7 +101,6 @@ to setup-households
        assign-reservation-wage-rate-h
        assign-liquidity-h
        assign-planned-monthly-consumption-expenditure
-       ;;set employer nobody
      ]
 end
 
@@ -148,18 +149,32 @@ to assign-provider-firms ;TOO links!!!
      [
        let number-of-provider-firms random-near average-number-of-provider-firms
        let firms-count count firms
-       if number-of-provider-firms > firms-count
-          [set number-of-provider-firms firms-count]
-       create-provider-firms-to n-of number-of-provider-firms firms
+       cap-value number-of-provider-firms firms-count
+       connect-to-n-random-firms number-of-provider-firms
      ]  
 end
 
+to connect-to-n-random-firms [n]
+  connect-to-firms (n-of n firms)
+end
+
+to connect-to-firms [fs]
+  create-provider-firms-to fs
+end
 
 to assign-employees 
   ask households 
      [
-       create-employee-to one-of firms
+       become-employee-of-random-firm
      ]  
+end
+
+to become-employee-of-random-firm
+  become-employee-of-firm one-of firms 
+end
+
+to become-employee-of-firm [f] 
+  create-employee-to f [set color blue]
 end
 
 ;;;
@@ -188,8 +203,7 @@ end
 
 to assign-num-work-positions-filled
   set num-work-positions-filled random-near-int average-num-work-positions-available
-  if num-work-positions-filled > num-work-positions-available
-    [set num-work-positions-filled num-work-positions-available]
+  cap-value num-work-positions-filled num-work-positions-available
 end
 
 ;;;
@@ -276,6 +290,12 @@ to fire-employee
    if fired-employee != nobody 
       [
         ask in-employee-from fired-employee [ die ]
+        set fired-employee nobody
+        increment num-work-positions-available 
+        decrement num-work-positions-filled
+        set work-position-has-been-offered? true ;;TODO CHECK IF APPROPRIATE HERE
+        set work-position-has-been-accepted? false ;;TODO CHECK IF APPROPRIATE HERE
+        set num-consecutive-months-all-work-positions-filled 0
       ] 
 end
 
@@ -289,14 +309,9 @@ to evolve-price-lower-upper-limits
   set price-upper-limit price-upper-limit-ratio * monthly-marginal-costs  
 end
 
-;;TODO: REMOVE
-;;to evolve-employees;; TODO replace with links
-;;  set employees households with [employer = myself]
-;;end
-
 to evolve-num-consecutive-months-with-all-positions-filled
   if num-work-positions-filled = num-work-positions-available 
-    [set num-consecutive-months-all-work-positions-filled num-consecutive-months-all-work-positions-filled + 1]
+    [increment num-consecutive-months-all-work-positions-filled]
 end
 
 to evolve-wage-rate
@@ -420,9 +435,16 @@ to try-set-new-employer [n-tries]
           and ([wage-rate-f] of chosen-potential-employer-firm) > reservation-wage-rate-h
           [
             ask my-out-employees [die] ;; kill link to current employer, if any
-            ask chosen-potential-employer-firm [set work-position-has-been-accepted? true]            
-            create-employee-to chosen-potential-employer-firm
-            set employer-set? true
+            ask chosen-potential-employer-firm 
+               [
+                 set work-position-has-been-offered? false ;;TODO SET THIS TO TRUE SOMEWHERE
+                 set work-position-has-been-accepted? true
+                 decrement num-work-positions-available 
+                 increment num-work-positions-filled
+               ]            
+            become-employee-of-firm chosen-potential-employer-firm
+
+            set employer-set? true            
           ] 
        set i (i - 1)     
      ]
@@ -590,6 +612,22 @@ end
 
 to-report div [n d]
   report floor n / d
+end
+
+to cap-value [v c]
+  if v > c [set v c]
+end
+
+to floor-value [v f]
+  if v < f [set v f]
+end
+
+to decrement [v]
+  set v (v - 1)
+end
+
+to increment [v]
+  set v (v + 1)
 end
 
 ;;
@@ -828,7 +866,7 @@ average-number-of-provider-firms
 average-number-of-provider-firms
 1
 20
-5
+7
 1
 1
 NIL
