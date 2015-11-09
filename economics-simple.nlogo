@@ -53,6 +53,7 @@ globals
     max-number-provider-firms-visited 
     technology-productivity-parameter                               ;;lambda
     claimed-wage-rate-percentage-reduction-if-unemployed 
+    employment-file-name 
 ]
 
 ;;;
@@ -70,6 +71,12 @@ to setup
   assign-employees  
   
   ask households [evolve-planned-monthly-consumption-expenditure]
+  
+  if file-exists? employment-file-name
+     [
+       file-close-all
+       file-delete employment-file-name
+     ]
   
   reset-ticks
 end
@@ -92,6 +99,7 @@ to setup-globals
     set max-number-provider-firms-visited 7
     set technology-productivity-parameter 3.0                           
     set claimed-wage-rate-percentage-reduction-if-unemployed 0.10  
+    set employment-file-name "c:\\temp\\employment-figures.txt"        
 end
 
 to setup-households
@@ -245,7 +253,6 @@ to evolve-first-day-of-month
       evolve-provider-firms
       evolve-employer
       evolve-planned-monthly-consumption-expenditure
-
     ]
 end
 
@@ -260,9 +267,9 @@ to evolve-last-day-of-month
       evolve-claimed-wage-rate
     ]
     
-  file-open "c:\\temp\\unemployment-figures.txt"
-  file-write (count firms with [work-position-has-been-offered? = true]) file-write "," file-print (count households with [get-employer = nobody]) 
-  file-flush
+  file-open employment-file-name
+  file-write (ticks) file-write (count firms with [work-position-has-been-offered? = true]) file-write (count get-unemployed-households) file-write (mean [wage-rate-f] of firms) file-print (count get-unemployed-households)
+  file-flush 
 end
 
 ;;
@@ -287,13 +294,16 @@ end
 to fire-employee
    if fired-employee != nobody 
       [
-        let connection-to-fired-employee in-employee-from fired-employee
-        if connection-to-fired-employee != nobody
-           [ask connection-to-fired-employee [ die ]]
+        break-connections-to-fired-employee
         set fired-employee nobody
-        ;;set num-work-positions-filled (decrement-floored-to-zero num-work-positions-filled);;REMOVE
         set num-consecutive-months-all-work-positions-filled 0
       ] 
+end
+
+to break-connections-to-fired-employee
+  let connection-to-fired-employee in-employee-from fired-employee
+  if connection-to-fired-employee != nobody
+    [ask connection-to-fired-employee [ die ]]
 end
 
 to evolve-inventory-lower-upper-limits
@@ -328,9 +338,7 @@ end
 
 to evolve-work-position-has-been-offered     
    ifelse inventory-f <= inventory-lower-limit
-      [
-        set work-position-has-been-offered? true
-      ]
+      [set work-position-has-been-offered? true]
       [set work-position-has-been-offered? false]
    set work-position-has-been-accepted? false ;;this will be set to true on daily ticks
 end
@@ -339,9 +347,7 @@ to evolve-fired-employee
   ifelse not any? my-in-employees
      [set fired-employee nobody]
      [ifelse inventory-f >= inventory-upper-limit and (count my-in-employees) > 1 ;; we do not fire the last employee
-        [
-           set fired-employee one-of in-employee-neighbors
-        ]
+        [set fired-employee one-of in-employee-neighbors]
         [set fired-employee nobody] 
      ]
 end
@@ -692,6 +698,12 @@ to-report increment [v]
   report v + 1
 end
 
+;; other common functions
+
+to-report get-unemployed-households
+  report households with [get-employer = nobody]
+end
+
 ;;
 ;; set operations
 ;;
@@ -707,6 +719,12 @@ end
 to-report except [set-a set-b]
   report set-a with [not member? self set-b]
 end
+
+
+;;
+;; monitoring household report 
+;;
+
 @#$#@#$#@
 GRAPHICS-WINDOW
 210
@@ -808,7 +826,7 @@ average-reservation-wage-rate-h
 average-reservation-wage-rate-h
 300
 3000
-1200
+1100
 50
 1
 NIL
