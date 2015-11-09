@@ -210,7 +210,7 @@ end
 ;;; GO PROCEDURES
 ;;;
 
-to go
+to go  
   let days ticks + 1
   if is-first-day-of-month? days [evolve-first-day-of-month]
   if is-last-day-of-month? days [evolve-last-day-of-month]
@@ -251,6 +251,10 @@ to evolve-last-day-of-month
     [
       evolve-claimed-wage-rate
     ]
+    
+  file-open "c:\\temp\\unemployment-figures1.txt"
+  file-write (count households with [get-employer = nobody]) file-write "," file-print (count firms with [work-position-has-been-offered? = true])
+  file-flush
 end
 
 ;;
@@ -765,7 +769,7 @@ average-liquidity-h
 average-liquidity-h
 1
 10000
-3201
+3601
 100
 1
 NIL
@@ -780,7 +784,7 @@ average-inventory-f
 average-inventory-f
 50
 5000
-50
+400
 10
 1
 NIL
@@ -795,7 +799,7 @@ average-liquidity-f
 average-liquidity-f
 1000
 200000
-12400
+39000
 100
 1
 NIL
@@ -825,7 +829,7 @@ average-price-f
 average-price-f
 10
 200
-20
+30
 10
 1
 NIL
