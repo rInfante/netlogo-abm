@@ -434,7 +434,7 @@ end
 
 to evolve-inventory
   set inventory-f (increase-by-amount inventory-f (technology-productivity-parameter * (count my-in-employees)))
-  show inventory-f
+  ;;show inventory-f
 end
 
 ;;
@@ -529,9 +529,9 @@ to evolve-liquidity-from-paying-salaries
   ;;TODO:check for possibly negative pnl
   if (count employees) > 0
   [
-    let pnl liquidity-f - paid-salaries
-    let employee-pnl pnl / (count employees)
-    ask in-employee-neighbors [pay-salary employee-pnl] ;;TODO: ACTUALLY must redistribute pnl not equally to all employees, but proportionally to their liquidity
+    let pnl floor-to-zero (liquidity-f - paid-salaries)
+    let total-employees-liquidity sum [liquidity-h] of in-employee-neighbors
+    ask in-employee-neighbors [pay-salary (liquidity-h / total-employees-liquidity) * pnl] 
   ]
   set liquidity-f 0.0
 end
@@ -701,7 +701,7 @@ number-of-firms
 number-of-firms
 0
 100
-100
+80
 1
 1
 NIL
@@ -825,7 +825,7 @@ average-price-f
 average-price-f
 10
 200
-10
+20
 10
 1
 NIL
@@ -860,6 +860,149 @@ days-in-one-month
 1
 NIL
 HORIZONTAL
+
+MONITOR
+677
+185
+803
+230
+number-unemployed
+count households with [get-employer = nobody]
+17
+1
+11
+
+MONITOR
+681
+242
+790
+287
+perc-unemployed
+(count households with [get-employer = nobody])/(number-of-households) * 100
+17
+1
+11
+
+MONITOR
+1074
+195
+1184
+240
+mean-inventory-f
+mean [inventory-f] of firms
+17
+1
+11
+
+MONITOR
+1081
+256
+1210
+301
+mean-demand-goods
+mean [monthly-demand-of-consumption-goods] of firms
+17
+1
+11
+
+MONITOR
+1079
+310
+1153
+355
+mean-price
+mean [price-f] of firms
+17
+1
+11
+
+MONITOR
+685
+307
+786
+352
+mean-liquidity-h
+mean [liquidity-h] of households
+17
+1
+11
+
+MONITOR
+682
+370
+796
+415
+mean-wage-asked
+mean [reservation-wage-rate-h] of households
+17
+1
+11
+
+MONITOR
+1083
+380
+1195
+425
+mean-wage-given
+mean [wage-rate-f] of firms
+17
+1
+11
+
+MONITOR
+1198
+199
+1287
+244
+mean-liquidity
+mean [liquidity-f] of firms
+17
+1
+11
+
+MONITOR
+1080
+437
+1218
+482
+firms-with-pos-offered
+count firms with [work-position-has-been-offered? = true]
+17
+1
+11
+
+MONITOR
+1087
+494
+1234
+539
+firms-with-pos-accepted
+count firms with [work-position-has-been-accepted? = true]
+17
+1
+11
+
+MONITOR
+1300
+199
+1408
+244
+mean-inv-up-limit
+mean [inventory-upper-limit] of firms
+17
+1
+11
+
+MONITOR
+1421
+199
+1519
+244
+mean-in-low-lim
+mean [inventory-lower-limit] of firms
+17
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
