@@ -1,3 +1,5 @@
+extensions [ rnd ]
+
 breed [households household]
 breed [firms firm]
 directed-link-breed [provider-firms provider-firm];;type A links
@@ -238,7 +240,12 @@ to evolve-first-day-of-month
       evolve-monthly-demand-of-consumption-goods
       evolve-monthly-marginal-costs
     ]
-  ask households []
+  ask households 
+    [
+      evolve-provider-firms
+      evolve-employer
+      evolve-planned-monthly-consumption-expenditure
+    ]
 end
 
 
@@ -262,11 +269,14 @@ to evolve-normal-day
       ;;CHECK IF NEED THIS: evolve-employees
       evolve-inventory
     ]
-  ask households []
+  ask households 
+    [
+      evolve-liquidity-from-daily-purchases
+    ]
 end
 
 ;;
-;; firm first-day-of-month
+;; FIRM first-day-of-month
 ;;
 
 to fire-employee
@@ -360,7 +370,75 @@ end
 
 
 ;;
-;; firm normal day
+;; HOUSEHOLD first-day-of-month
+;;
+
+to evolve-provider-firms
+  let is-event-happening is-happening-with-probability? probability-of-household-picking-new-provider-firm
+  if is-event-happening
+     [
+       let chosen-connected-provider-link one-of my-out-provider-firms
+       let chosen-connected-provider-firm [end2] of chosen-connected-provider-link
+       let chosen-unconnected-provider-firm choose-unconnected-firm-randomly-weighted-on-employee-count
+       let price-of-chosen-connected-provider-firm [price-f] of chosen-connected-provider-firm
+       let price-of-chosen-unconnected-provider-firm [price-f] of chosen-unconnected-provider-firm
+       let price-percent-difference percent-difference price-of-chosen-connected-provider-firm price-of-chosen-unconnected-provider-firm
+       if price-percent-difference > price-threshold-of-household-picking-new-provider-firm
+          [
+            ask chosen-connected-provider-link [ die ] ;;remove previous provider firm link
+            create-provider-firm-to chosen-unconnected-provider-firm
+          ]
+     ]
+   ;;TODO(*must further evolve Provider firms based on unfulfilled demand of some providers: beginning of page 11*)
+end
+
+to-report choose-unconnected-firm-randomly-weighted-on-employee-count
+  let unconnected-firms except firms out-provider-firm-neighbors
+  report rnd:weighted-one-of unconnected-firms [count in-employee-neighbors]
+end
+
+to evolve-employer
+  let employer one-of out-employee-neighbors
+  ifelse employer = nobody 
+     [try-set-new-employer max-number-potential-employers-visited] ;;unemployed
+     [
+       let current-employer-wage-rate [wage-rate-f] of employer
+       ifelse reservation-wage-rate-h < current-employer-wage-rate ;;unhappy employee
+          [try-set-new-employer 1]
+          [
+             let is-event-happening is-happening-with-probability? probability-of-household-visiting-potential-new-employer
+             if is-event-happening    
+                [try-set-new-employer 1]        
+          ]
+     ]
+end
+
+to try-set-new-employer [n-tries]
+  let i n-tries
+  let employer-set? false
+  while [i > 0 and not employer-set?]
+     [
+       let chosen-potential-employer-firm one-of firms   
+       if [work-position-has-been-offered? and (not work-position-has-been-accepted?)] of chosen-potential-employer-firm
+          and ([wage-rate-f] of chosen-potential-employer-firm) > reservation-wage-rate-h
+          [
+            ask my-out-employees [die] ;; kill link to current employer, if any
+            ask chosen-potential-employer-firm [set work-position-has-been-accepted? true]            
+            create-employee-to chosen-potential-employer-firm
+            set employer-set? true
+          ] 
+       set i (i - 1)     
+     ]
+end
+
+to evolve-planned-monthly-consumption-expenditure
+  let average-goods-price-of-provider-firms mean [price-f] of out-provider-firm-neighbors
+  let liquidity-ratio liquidity-h / average-goods-price-of-provider-firms
+  set planned-monthly-consumption-expenditure (min (list (liquidity-ratio ^ planned-consumption-increase-decaying-rate) liquidity-ratio))
+end
+
+;;
+;; FIRM normal day
 ;;
 
 to evolve-inventory
@@ -375,7 +453,46 @@ to-report buy-goods [q] ;;quantity
 end
 
 ;;
-;; firm last-day-of-month
+;; HOUSEHOLD normal day
+;;
+
+to evolve-liquidity-from-daily-purchases
+  try-to-transact-with-provider-firms
+end
+
+to try-to-transact-with-provider-firms
+  let planned-daily-consumption-demand planned-monthly-consumption-expenditure / days-in-one-month
+end
+
+to transact-with-provider-firm [n-tries planned-daily-consumption-demand]
+  let i n-tries
+  let liquidity-h-set? false
+  while [i > 0 and not liquidity-h-set?]
+     [
+       let chosen-provider-firm one-of out-provider-firm-neighbors  
+       let chosen-provider-firm-inventory [inventory-f] of chosen-provider-firm
+       let chosen-provider-firm-price [price-f] of chosen-provider-firm  
+       ifelse chosen-provider-firm-inventory > planned-daily-consumption-demand
+          and (liquidity-h >= chosen-provider-firm-price * planned-daily-consumption-demand)
+          [
+            let puchase-cost [buy-goods planned-daily-consumption-demand] of chosen-provider-firm
+            set liquidity-h (liquidity-h - puchase-cost)
+            set liquidity-h-set? true
+          ]
+          [
+            ifelse liquidity-h < chosen-provider-firm-price * planned-daily-consumption-demand
+            [
+              let adjusted-daily-consumption-demand div floor (liquidity-h) floor (chosen-provider-firm-price)
+            ]
+            [
+            ]
+          ] 
+       set i (i - 1)     
+     ]  
+end
+
+;;
+;; FIRM last-day-of-month
 ;;
 
 to evolve-liquidity-from-paying-salaries
@@ -437,6 +554,30 @@ end
 
 to-report floor-to-zero [v]
   ifelse v < 0 [report 0][report v]
+end
+
+to-report percent-difference [n1 n2] ;;Number1 and Number2 are between 0.0 and 1.0 (they are 
+  report abs (n2 - n1) / n1
+end
+
+to-report div [n d]
+  report floor n / d
+end
+
+;;
+;; set operations
+;;
+
+to-report union [set-a set-b]
+  report (turtle-set set-a set-b)
+end
+
+to-report intersection [set-a set-b]
+  report set-a with [member? self set-b]
+end
+
+to-report except [set-a set-b]
+  report set-a with [not member? self set-b]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
