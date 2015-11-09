@@ -529,9 +529,9 @@ to evolve-liquidity-from-paying-salaries
   ;;TODO:check for possibly negative pnl
   if (count employees) > 0
   [
-    let pnl floor-to-zero (liquidity-f - paid-salaries)
+    let pnl (liquidity-f - paid-salaries)
     let total-employees-liquidity sum [liquidity-h] of in-employee-neighbors
-    ask in-employee-neighbors [pay-salary (liquidity-h / total-employees-liquidity) * pnl] 
+    ask in-employee-neighbors [pay-salary (liquidity-h / total-employees-liquidity) * pnl] ;;pay bonus (if pnl > 0) or charge employee (if pnl < 0)
   ]
   set liquidity-f 0.0
 end
@@ -651,10 +651,10 @@ to-report except [set-a set-b]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-211
-14
-664
-462
+210
+21
+663
+469
 17
 16
 12.66
@@ -701,7 +701,7 @@ number-of-firms
 number-of-firms
 0
 100
-80
+91
 1
 1
 NIL
@@ -765,7 +765,7 @@ average-liquidity-h
 average-liquidity-h
 1
 10000
-201
+3201
 100
 1
 NIL
@@ -832,10 +832,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-670
-134
-903
-167
+666
+96
+899
+129
 average-number-of-provider-firms
 average-number-of-provider-firms
 1
@@ -847,10 +847,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-5
-172
-177
-205
+11
+179
+176
+212
 days-in-one-month
 days-in-one-month
 20
@@ -862,10 +862,10 @@ NIL
 HORIZONTAL
 
 MONITOR
-677
-185
-803
-230
+672
+184
+798
+229
 number-unemployed
 count households with [get-employer = nobody]
 17
@@ -873,10 +873,10 @@ count households with [get-employer = nobody]
 11
 
 MONITOR
-681
-242
-790
-287
+804
+185
+913
+230
 perc-unemployed
 (count households with [get-employer = nobody])/(number-of-households) * 100
 17
@@ -884,10 +884,10 @@ perc-unemployed
 11
 
 MONITOR
-1074
-195
-1184
-240
+1072
+191
+1182
+236
 mean-inventory-f
 mean [inventory-f] of firms
 17
@@ -895,10 +895,10 @@ mean [inventory-f] of firms
 11
 
 MONITOR
-1081
-256
-1210
-301
+1192
+242
+1321
+287
 mean-demand-goods
 mean [monthly-demand-of-consumption-goods] of firms
 17
@@ -906,10 +906,10 @@ mean [monthly-demand-of-consumption-goods] of firms
 11
 
 MONITOR
-1079
-310
-1153
-355
+1326
+243
+1400
+288
 mean-price
 mean [price-f] of firms
 17
@@ -917,10 +917,10 @@ mean [price-f] of firms
 11
 
 MONITOR
-685
-307
-786
-352
+672
+236
+773
+281
 mean-liquidity-h
 mean [liquidity-h] of households
 17
@@ -928,10 +928,10 @@ mean [liquidity-h] of households
 11
 
 MONITOR
-682
-370
-796
-415
+671
+288
+785
+333
 mean-wage-asked
 mean [reservation-wage-rate-h] of households
 17
@@ -939,10 +939,10 @@ mean [reservation-wage-rate-h] of households
 11
 
 MONITOR
-1083
-380
-1195
-425
+1073
+297
+1185
+342
 mean-wage-given
 mean [wage-rate-f] of firms
 17
@@ -950,10 +950,10 @@ mean [wage-rate-f] of firms
 11
 
 MONITOR
-1198
-199
-1287
-244
+1073
+241
+1162
+286
 mean-liquidity
 mean [liquidity-f] of firms
 17
@@ -961,10 +961,10 @@ mean [liquidity-f] of firms
 11
 
 MONITOR
-1080
-437
-1218
-482
+1072
+348
+1210
+393
 firms-with-pos-offered
 count firms with [work-position-has-been-offered? = true]
 17
@@ -972,10 +972,10 @@ count firms with [work-position-has-been-offered? = true]
 11
 
 MONITOR
-1087
-494
-1234
-539
+1212
+349
+1359
+394
 firms-with-pos-accepted
 count firms with [work-position-has-been-accepted? = true]
 17
@@ -983,10 +983,10 @@ count firms with [work-position-has-been-accepted? = true]
 11
 
 MONITOR
-1300
-199
-1408
-244
+1191
+189
+1299
+234
 mean-inv-up-limit
 mean [inventory-upper-limit] of firms
 17
@@ -994,15 +994,55 @@ mean [inventory-upper-limit] of firms
 11
 
 MONITOR
-1421
-199
-1519
-244
-mean-in-low-lim
+1309
+188
+1414
+233
+mean-in-low-limit
 mean [inventory-lower-limit] of firms
 17
 1
 11
+
+MONITOR
+12
+242
+99
+287
+num-months
+ticks / days-in-one-month
+17
+1
+11
+
+MONITOR
+15
+306
+72
+351
+years
+ticks / days-in-one-month / 12
+17
+1
+11
+
+PLOT
+674
+404
+1360
+770
+unemployment
+time
+unemployment %
+0.0
+50.0
+0.0
+10.0
+true
+true
+"" ""
+PENS
+"default" 1.0 0 -16777216 true "" "plot (count households with [get-employer = nobody])/(count households) * 100"
 
 @#$#@#$#@
 ## WHAT IS IT?
