@@ -1,4 +1,4 @@
-extensions [ rnd ]
+extensions [ rnd table ]
 
 breed [households household]
 breed [firms firm]
@@ -11,6 +11,7 @@ households-own
     liquidity-h             ;;m_h
     
     planned-monthly-consumption-expenditure ;;c_r_h
+    firms-with-unsatisfied-demand-table 
 ]
 
 firms-own
@@ -44,6 +45,7 @@ globals
     probability-of-setting-new-price                                ;;theta
     price-growth-rate-uniform-distribution-upper-support            ;;upsilon
     probability-of-household-picking-new-provider-firm 
+    probability-of-household-sacking-unsatisfactory-provider-firm
     price-threshold-of-household-picking-new-provider-firm 
     max-number-potential-employers-visited 
     probability-of-household-visiting-potential-new-employer 
@@ -82,6 +84,7 @@ to setup-globals
     set probability-of-setting-new-price 0.75                          
     set price-growth-rate-uniform-distribution-upper-support 0.02       
     set probability-of-household-picking-new-provider-firm 0.25
+    set probability-of-household-sacking-unsatisfactory-provider-firm 0.25
     set price-threshold-of-household-picking-new-provider-firm 0.01
     set max-number-potential-employers-visited 5
     set probability-of-household-visiting-potential-new-employer 0.1
@@ -100,6 +103,7 @@ to setup-households
        
        assign-reservation-wage-rate-h
        assign-liquidity-h       
+       assign-firms-with-unsatisfied-demand-table
      ]
 end
 
@@ -138,6 +142,10 @@ to assign-liquidity-h
   set liquidity-h random-near average-liquidity-h
 end
 
+to assign-firms-with-unsatisfied-demand-table
+  set firms-with-unsatisfied-demand-table table:make
+end
+
 to assign-provider-firms ;
   ask households
      [
@@ -153,7 +161,7 @@ to connect-to-n-random-firms [n]
 end
 
 to connect-to-firms [fs]
-  create-provider-firms-to fs
+  create-provider-firms-to fs [set color orange]
 end
 
 to assign-employees 
@@ -229,8 +237,8 @@ to evolve-first-day-of-month
       evolve-work-positions
       evolve-goods-price    
       
-      evolve-monthly-demand-of-consumption-goods
       evolve-marginal-costs
+      evolve-monthly-demand-of-consumption-goods      
     ]
   ask households 
     [
@@ -343,7 +351,7 @@ to evolve-goods-price
    ifelse inventory-f <= inventory-lower-limit
       [if price-f <= price-upper-limit
          [set price-f increase-with-probability probability-of-setting-new-price price-f ni]]
-      [if price-f >= price-upper-limit
+      [if price-f >= price-lower-limit
          [set price-f decrease-with-probability probability-of-setting-new-price price-f ni]]   
 end
 
@@ -352,7 +360,8 @@ to evolve-monthly-demand-of-consumption-goods
 end
 
 to evolve-marginal-costs
-  ;;THERE IS NO LOGIC TO EVOLVE marginal-costa
+  if monthly-demand-of-consumption-goods > 0
+    [set marginal-cost ((count my-in-employees) * wage-rate-f) / monthly-demand-of-consumption-goods]
 end
 
 
@@ -361,8 +370,8 @@ end
 ;;
 
 to evolve-provider-firms
-  let is-event-happening is-happening-with-probability? probability-of-household-picking-new-provider-firm
-  if is-event-happening
+  let is-picking-new-provider-firm-event-happening? is-happening-with-probability? probability-of-household-picking-new-provider-firm
+  if is-picking-new-provider-firm-event-happening?
      [
        let chosen-connected-provider-link one-of my-out-provider-firms
        let chosen-connected-provider-firm [end2] of chosen-connected-provider-link
@@ -373,15 +382,39 @@ to evolve-provider-firms
        if price-percent-difference < (0.0 - price-threshold-of-household-picking-new-provider-firm)
           [
             ask chosen-connected-provider-link [ die ] ;;remove previous provider firm link
-            create-provider-firm-to chosen-unconnected-provider-firm
+            create-provider-firm-to chosen-unconnected-provider-firm [set color orange]
           ]
      ]
-   ;;TODO(*must further evolve Provider firms based on unfulfilled demand of some providers: beginning of page 11*)
+  let is-sacking-unsatisfactory-provider-firm-event-happening? is-happening-with-probability? probability-of-household-sacking-unsatisfactory-provider-firm
+  if is-sacking-unsatisfactory-provider-firm-event-happening?
+     [  
+       if (table:length firms-with-unsatisfied-demand-table) > 0   
+          [
+            let chosen-connected-provider-firm choose-connected-firm-randomly-weighted-on-unsatisfied-demand
+            let chosen-connected-provider-link out-provider-firm-to chosen-connected-provider-firm
+            let chosen-unconnected-provider-firm choose-unconnected-firm-randomly-weighted-on-employee-count
+            
+            if (chosen-connected-provider-link != nobody)
+            [ 
+              ;;show [who] of chosen-connected-provider-firm
+              ask chosen-connected-provider-link [die]
+              create-provider-firm-to chosen-unconnected-provider-firm [set color orange]
+            ]     
+          ]  
+     ]   
+     
+  table:clear firms-with-unsatisfied-demand-table ;;unsatisfied demand stats from previous month are cleared
 end
 
 to-report choose-unconnected-firm-randomly-weighted-on-employee-count
   let unconnected-firms except firms out-provider-firm-neighbors
   report rnd:weighted-one-of unconnected-firms [count in-employee-neighbors]
+end
+
+to-report choose-connected-firm-randomly-weighted-on-unsatisfied-demand
+  let pairs table:to-list firms-with-unsatisfied-demand-table
+  let who-of-randomly-selected-firm item 0 rnd:weighted-one-of pairs [ item 1 ? ] ;;get the who key (item 0) from the pairs which has selected with a weight-based random selection on the unsatisfied demand (item 1)
+  report one-of firms with [who = who-of-randomly-selected-firm]
 end
 
 to evolve-employer
@@ -466,7 +499,7 @@ to transact-with-provider-firm [n-tries planned-daily-consumption-demand]
        let chosen-provider-firm-inventory [inventory-f] of chosen-provider-firm
        let chosen-provider-firm-price [price-f] of chosen-provider-firm
        let chosen-provider-firm-liquidity [liquidity-f] of chosen-provider-firm  
-       ifelse chosen-provider-firm-inventory > daily-unsatisfied-satisfied-demand
+       ifelse chosen-provider-firm-inventory >= daily-unsatisfied-satisfied-demand
          [
            ifelse (liquidity-h >= chosen-provider-firm-price * daily-unsatisfied-satisfied-demand)
            [
@@ -479,7 +512,7 @@ to transact-with-provider-firm [n-tries planned-daily-consumption-demand]
              set satisfied-demand? true
            ]
            [
-             let adjusted-daily-consumption-demand div floor (liquidity-h) floor (chosen-provider-firm-price)
+             let adjusted-daily-consumption-demand (div floor (liquidity-h) floor (chosen-provider-firm-price))
              
              let purchase-quantity adjusted-daily-consumption-demand
              let purchase-cost (chosen-provider-firm-price * purchase-quantity)                       
@@ -492,6 +525,10 @@ to transact-with-provider-firm [n-tries planned-daily-consumption-demand]
          ]
          [                         
            let adjusted-daily-consumption-demand chosen-provider-firm-inventory
+           
+           let chosen-provider-firm-unsatisfied-demand (daily-unsatisfied-satisfied-demand - chosen-provider-firm-inventory)
+           let chosen-provider-firm-who ([who] of chosen-provider-firm)
+           update-firms-with-unsatisfied-demand-table chosen-provider-firm-who chosen-provider-firm-unsatisfied-demand
            
            let purchase-quantity adjusted-daily-consumption-demand
            let purchase-cost (chosen-provider-firm-price * purchase-quantity)                       
@@ -508,13 +545,28 @@ to transact-with-provider-firm [n-tries planned-daily-consumption-demand]
      set i (i + 1)     
    ]  
 end
+     
+to-report get-previous-chosen-provider-firm-unsatisfied-demand [provider-firm-who]
+  ifelse (table:has-key? firms-with-unsatisfied-demand-table provider-firm-who) = true 
+     [report (table:get firms-with-unsatisfied-demand-table provider-firm-who)]      
+     [report 0.0]
+end 
+
+to update-firms-with-unsatisfied-demand-table [provider-firm-who unsatisfied-demand]
+  ifelse (table:has-key? firms-with-unsatisfied-demand-table provider-firm-who) = true 
+     [
+       let previous-chosen-provider-firm-unsatisfied-demand (table:get firms-with-unsatisfied-demand-table provider-firm-who)
+       table:put firms-with-unsatisfied-demand-table provider-firm-who (previous-chosen-provider-firm-unsatisfied-demand + unsatisfied-demand)
+     ]              
+     [table:put firms-with-unsatisfied-demand-table provider-firm-who unsatisfied-demand]
+end 
 
 to buy-goods [purchase-quantity purchase-cost chosen-provider-firm]
   set liquidity-h floor-to-zero (decrease-by-amount liquidity-h purchase-cost)
   
   ask chosen-provider-firm
     [      
-      set inventory-f (decrease-by-amount inventory-f purchase-quantity)
+      set inventory-f floor-to-zero (decrease-by-amount inventory-f purchase-quantity)
       set monthly-demand-of-consumption-goods (increase-by-amount monthly-demand-of-consumption-goods purchase-quantity)
       set liquidity-f floor-to-zero (increase-by-amount liquidity-f purchase-cost)              
     ]
@@ -615,7 +667,9 @@ to-report percent-difference [n1 n2] ;;Number1 and Number2 are between 0.0 and 1
 end
 
 to-report div [n d]
-  report floor n / d
+  ifelse d != 0
+    [report floor n / d]
+    [report 0.0]
 end
 
 to-report cap-value [v c]
@@ -769,7 +823,7 @@ average-liquidity-h
 average-liquidity-h
 1
 10000
-3601
+3701
 100
 1
 NIL
@@ -784,7 +838,7 @@ average-inventory-f
 average-inventory-f
 50
 5000
-400
+640
 10
 1
 NIL
@@ -799,7 +853,7 @@ average-liquidity-f
 average-liquidity-f
 1000
 200000
-35200
+31400
 100
 1
 NIL
@@ -888,10 +942,10 @@ perc-unemployed
 11
 
 MONITOR
-1072
-191
-1182
-236
+1186
+188
+1296
+233
 mean-inventory-f
 mean [inventory-f] of firms
 17
@@ -910,10 +964,10 @@ mean [monthly-demand-of-consumption-goods] of firms
 11
 
 MONITOR
-1326
-243
-1400
-288
+1596
+187
+1670
+232
 mean-price
 mean [price-f] of firms
 17
@@ -987,10 +1041,10 @@ count firms with [work-position-has-been-accepted? = true]
 11
 
 MONITOR
-1191
-189
-1299
-234
+1301
+188
+1409
+233
 mean-inv-up-limit
 mean [inventory-upper-limit] of firms
 17
@@ -998,10 +1052,10 @@ mean [inventory-upper-limit] of firms
 11
 
 MONITOR
-1309
-188
-1414
-233
+1073
+187
+1178
+232
 mean-in-low-limit
 mean [inventory-lower-limit] of firms
 17
@@ -1047,6 +1101,50 @@ true
 "" ""
 PENS
 "default" 1.0 0 -16777216 true "" "plot (count households with [get-employer = nobody])/(count households) * 100"
+
+MONITOR
+812
+245
+996
+290
+mean-unsatisfactory-providers
+mean [table:length firms-with-unsatisfied-demand-table ] of households
+17
+1
+11
+
+MONITOR
+1675
+188
+1793
+233
+mean-price-up-limit
+mean [price-upper-limit] of firms
+17
+1
+11
+
+MONITOR
+1468
+186
+1591
+231
+mean-price-low-limit
+mean [price-lower-limit] of firms
+17
+1
+11
+
+MONITOR
+1333
+243
+1454
+288
+mean-marginal-cost
+mean [marginal-cost] of firms
+17
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
