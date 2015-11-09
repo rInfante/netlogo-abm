@@ -370,7 +370,7 @@ to evolve-provider-firms
        let price-of-chosen-connected-provider-firm [price-f] of chosen-connected-provider-firm
        let price-of-chosen-unconnected-provider-firm [price-f] of chosen-unconnected-provider-firm
        let price-percent-difference percent-difference price-of-chosen-connected-provider-firm price-of-chosen-unconnected-provider-firm
-       if price-percent-difference > price-threshold-of-household-picking-new-provider-firm
+       if price-percent-difference < (0.0 - price-threshold-of-household-picking-new-provider-firm)
           [
             ask chosen-connected-provider-link [ die ] ;;remove previous provider firm link
             create-provider-firm-to chosen-unconnected-provider-firm
@@ -611,7 +611,7 @@ to-report floor-to-zero [v]
 end
 
 to-report percent-difference [n1 n2] ;;Number1 and Number2 are between 0.0 and 1.0 (they are 
-  report abs (n2 - n1) / n1
+  report (n2 - n1) / n1
 end
 
 to-report div [n d]
@@ -799,7 +799,7 @@ average-liquidity-f
 average-liquidity-f
 1000
 200000
-39000
+35200
 100
 1
 NIL
