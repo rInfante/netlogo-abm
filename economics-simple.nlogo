@@ -20,14 +20,12 @@ firms-own
     wage-rate-f    ;;w_f
     price-f        ;;p_f
     
-    ;;num-work-positions-available ;;total number of positions;;REMOVE
-    ;;num-work-positions-filled;; REMOVE
     work-position-has-been-offered?
     work-position-has-been-accepted?
     num-consecutive-months-all-work-positions-filled
     fired-employee
     monthly-demand-of-consumption-goods;;sales from previous month
-    monthly-marginal-costs    
+    marginal-cost
     inventory-lower-limit
     inventory-upper-limit 
     price-lower-limit
@@ -69,6 +67,8 @@ to setup
   assign-provider-firms
   assign-employees  
   
+  ask households [evolve-planned-monthly-consumption-expenditure]
+  
   reset-ticks
 end
 
@@ -99,8 +99,7 @@ to setup-households
        set color green
        
        assign-reservation-wage-rate-h
-       assign-liquidity-h
-       assign-planned-monthly-consumption-expenditure
+       assign-liquidity-h       
      ]
 end
 
@@ -122,8 +121,8 @@ to setup-firms
        set work-position-has-been-accepted? false
        set num-consecutive-months-all-work-positions-filled 0
        set fired-employee nobody
-       set monthly-demand-of-consumption-goods inventory-f * 2 ;;TODO: must evolve this to at the beginning / end of the month: aggregated purchases from consumers?
-       set monthly-marginal-costs price-f ;;TODO: must evolve this to at the beginning / end of the month: aggregated purchases from consumers?
+       set monthly-demand-of-consumption-goods inventory-f * 0.80 ;;TODO: must evolve this to at the beginning / end of the month: aggregated purchases from consumers?
+       set marginal-cost price-f * 0.90 ;;TODO: must evolve this to at the beginning / end of the month: aggregated purchases from consumers?
      ]  
 end
 
@@ -137,10 +136,6 @@ end
 
 to assign-liquidity-h
   set liquidity-h random-near average-liquidity-h
-end
-
-to assign-planned-monthly-consumption-expenditure
-  set planned-monthly-consumption-expenditure random-near average-planned-monthly-consumption-expenditure
 end
 
 to assign-provider-firms ;
@@ -235,7 +230,7 @@ to evolve-first-day-of-month
       evolve-goods-price    
       
       evolve-monthly-demand-of-consumption-goods
-      evolve-monthly-marginal-costs
+      evolve-marginal-costs
     ]
   ask households 
     [
@@ -280,6 +275,7 @@ end
 to fire-employee
    if fired-employee != nobody 
       [
+        show sentence "FIRED " who
         let connection-to-fired-employee in-employee-from fired-employee
         if connection-to-fired-employee != nobody
            [ask connection-to-fired-employee [ die ]]
@@ -295,12 +291,15 @@ to evolve-inventory-lower-upper-limits
 end
 
 to evolve-price-lower-upper-limits
-  set price-lower-limit price-lower-limit-ratio * monthly-marginal-costs
-  set price-upper-limit price-upper-limit-ratio * monthly-marginal-costs  
+  set price-lower-limit price-lower-limit-ratio * marginal-cost
+  set price-upper-limit price-upper-limit-ratio * marginal-cost
 end
 
 to evolve-num-consecutive-months-with-all-positions-filled
+  show "INCREASE CON MONTH"
+  show num-consecutive-months-all-work-positions-filled
   set num-consecutive-months-all-work-positions-filled (increment num-consecutive-months-all-work-positions-filled)
+  show num-consecutive-months-all-work-positions-filled
   ;;this is reset to 0 only one employee is fired
 end
 
@@ -319,9 +318,11 @@ to evolve-work-positions
   evolve-fired-employee
 end
 
-to evolve-work-position-has-been-offered
+to evolve-work-position-has-been-offered     
    ifelse inventory-f <= inventory-lower-limit
-      [set work-position-has-been-offered? true]
+      [
+        set work-position-has-been-offered? true
+      ]
       [set work-position-has-been-offered? false]
    set work-position-has-been-accepted? false ;;this will be set to true on daily ticks
 end
@@ -329,7 +330,7 @@ end
 to evolve-fired-employee
   ifelse not any? my-in-employees
      [set fired-employee nobody]
-     [ifelse inventory-f > inventory-upper-limit
+     [ifelse inventory-f >= inventory-upper-limit
         [
            set fired-employee one-of in-employee-neighbors
         ]
@@ -339,10 +340,10 @@ end
 
 to evolve-goods-price
    let ni random-float price-growth-rate-uniform-distribution-upper-support
-   ifelse inventory-f < inventory-lower-limit
-      [if price-f < price-upper-limit
+   ifelse inventory-f <= inventory-lower-limit
+      [if price-f <= price-upper-limit
          [set price-f increase-with-probability probability-of-setting-new-price price-f ni]]
-      [if price-f > price-upper-limit
+      [if price-f >= price-upper-limit
          [set price-f decrease-with-probability probability-of-setting-new-price price-f ni]]   
 end
 
@@ -350,8 +351,8 @@ to evolve-monthly-demand-of-consumption-goods
   set monthly-demand-of-consumption-goods 0 ;;this is reset at the beginning of every month
 end
 
-to evolve-monthly-marginal-costs
-  ;;SET PROPER LOGIC HERE... set monthly-marginal-costs ... reset to 0 at the beginning of the month?
+to evolve-marginal-costs
+  ;;THERE IS NO LOGIC TO EVOLVE marginal-costa
 end
 
 
@@ -421,7 +422,7 @@ to try-set-new-employer [n-tries]
 
             set employer-set? true            
           ] 
-       set i (i - 1)     
+       set i (decrement i)     
      ]
 end
 
@@ -436,7 +437,8 @@ end
 ;;
 
 to evolve-inventory
-  set inventory-f (increase-by-amount inventory-f technology-productivity-parameter * (count my-in-employees))
+  set inventory-f (increase-by-amount inventory-f (technology-productivity-parameter * (count my-in-employees)))
+  show inventory-f
 end
 
 ;;
@@ -455,10 +457,10 @@ end
 
 to transact-with-provider-firm [n-tries planned-daily-consumption-demand]
   let i 0
-  let liquidity-h-set? false
+  let satisfied-demand? false
   let daily-unsatisfied-satisfied-demand planned-daily-consumption-demand
   
-  while [i < n-tries and not liquidity-h-set?]
+  while [i < n-tries and not satisfied-demand?]
      [
        let chosen-provider-firm one-of out-provider-firm-neighbors  
        let chosen-provider-firm-inventory [inventory-f] of chosen-provider-firm
@@ -474,7 +476,7 @@ to transact-with-provider-firm [n-tries planned-daily-consumption-demand]
              buy-goods purchase-quantity purchase-cost chosen-provider-firm
              
              set daily-unsatisfied-satisfied-demand 0.0             
-             set liquidity-h-set? true
+             set satisfied-demand? true
            ]
            [
              let adjusted-daily-consumption-demand div floor (liquidity-h) floor (chosen-provider-firm-price)
@@ -485,7 +487,7 @@ to transact-with-provider-firm [n-tries planned-daily-consumption-demand]
              buy-goods purchase-quantity purchase-cost chosen-provider-firm
              
              set daily-unsatisfied-satisfied-demand 0.0
-             set liquidity-h-set? true
+             set satisfied-demand? true
            ]
          ]
          [                         
@@ -500,7 +502,7 @@ to transact-with-provider-firm [n-tries planned-daily-consumption-demand]
            
            if (i >= n-tries) or (daily-unsatisfied-satisfied-demand < 0.05 * planned-daily-consumption-demand)
              [
-               set liquidity-h-set? true
+               set satisfied-demand? true
              ]                       
          ]        
      set i (i + 1)     
@@ -508,13 +510,13 @@ to transact-with-provider-firm [n-tries planned-daily-consumption-demand]
 end
 
 to buy-goods [purchase-quantity purchase-cost chosen-provider-firm]
-  set liquidity-h (decrease-by-amount liquidity-h purchase-cost)
+  set liquidity-h floor-to-zero (decrease-by-amount liquidity-h purchase-cost)
   
   ask chosen-provider-firm
-    [
+    [      
       set inventory-f (decrease-by-amount inventory-f purchase-quantity)
       set monthly-demand-of-consumption-goods (increase-by-amount monthly-demand-of-consumption-goods purchase-quantity)
-      set liquidity-f (increase-by-amount liquidity-f purchase-cost)                
+      set liquidity-f floor-to-zero (increase-by-amount liquidity-f purchase-cost)              
     ]
 end
 
@@ -523,10 +525,12 @@ end
 ;;
 
 to evolve-liquidity-from-paying-salaries
+  ;;TODO:check for possibly negative liquidiy
   let paid-salaries (count  my-in-employees) * wage-rate-f
   let salary wage-rate-f
   ask in-employee-neighbors [pay-salary salary]
   
+  ;;TODO:check for possibly negative pnl
   if (count employees) > 0
   [
     let pnl liquidity-f - paid-salaries
@@ -537,11 +541,11 @@ to evolve-liquidity-from-paying-salaries
 end
 
 ;;
-;; household last-day-of-month
+;; HOUSEHOLD last-day-of-month
 ;;
 
 to pay-salary [s] ;;salary
-  set liquidity-h liquidity-h + s
+  set liquidity-h floor-to-zero (increase-by-amount liquidity-h s)
 end
 
 to evolve-claimed-wage-rate
@@ -651,10 +655,10 @@ to-report except [set-a set-b]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-210
-16
-663
-464
+211
+14
+664
+462
 17
 16
 12.66
@@ -685,8 +689,8 @@ SLIDER
 number-of-households
 number-of-households
 0
-100
-100
+2000
+1000
 1
 1
 NIL
@@ -701,7 +705,7 @@ number-of-firms
 number-of-firms
 0
 100
-11
+15
 1
 1
 NIL
@@ -748,10 +752,10 @@ SLIDER
 48
 average-reservation-wage-rate-h
 average-reservation-wage-rate-h
-500
+300
 3000
-1000
-100
+500
+50
 1
 NIL
 HORIZONTAL
@@ -765,22 +769,7 @@ average-liquidity-h
 average-liquidity-h
 1
 10000
-5000
-100
-1
-NIL
-HORIZONTAL
-
-SLIDER
-666
-94
-1004
-127
-average-planned-monthly-consumption-expenditure
-average-planned-monthly-consumption-expenditure
-400
-1500
-600
+601
 100
 1
 NIL
@@ -794,8 +783,8 @@ SLIDER
 average-inventory-f
 average-inventory-f
 500
-100000
-10500
+5000
+500
 100
 1
 NIL
@@ -810,7 +799,7 @@ average-liquidity-f
 average-liquidity-f
 1000
 200000
-30200
+14900
 100
 1
 NIL
@@ -823,9 +812,9 @@ SLIDER
 127
 average-wage-rate-f
 average-wage-rate-f
-500
+300
 2000
-1000
+500
 10
 1
 NIL
@@ -840,23 +829,8 @@ average-price-f
 average-price-f
 10
 200
-30
+50
 10
-1
-NIL
-HORIZONTAL
-
-SLIDER
-1071
-176
-1332
-209
-average-num-work-positions-available
-average-num-work-positions-available
-5
-100
-10
-1
 1
 NIL
 HORIZONTAL
