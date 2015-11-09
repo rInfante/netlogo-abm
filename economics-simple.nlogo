@@ -297,13 +297,13 @@ to fire-employee
 end
 
 to evolve-inventory-lower-upper-limits
-  set inventory-lower-limit inventory-lower-limit-ratio * monthly-demand-of-consumption-goods
-  set inventory-upper-limit inventory-upper-limit-ratio * monthly-demand-of-consumption-goods
+  set inventory-lower-limit (inventory-lower-limit-ratio * monthly-demand-of-consumption-goods)
+  set inventory-upper-limit (inventory-upper-limit-ratio * monthly-demand-of-consumption-goods)
 end
 
 to evolve-price-lower-upper-limits
-  set price-lower-limit price-lower-limit-ratio * marginal-cost
-  set price-upper-limit price-upper-limit-ratio * marginal-cost
+  set price-lower-limit (price-lower-limit-ratio * marginal-cost)
+  set price-upper-limit (price-upper-limit-ratio * marginal-cost)
 end
 
 to evolve-num-consecutive-months-with-all-positions-filled
@@ -461,7 +461,7 @@ end
 
 to evolve-planned-monthly-consumption-expenditure
   let average-goods-price-of-provider-firms mean [price-f] of out-provider-firm-neighbors
-  let liquidity-ratio liquidity-h / average-goods-price-of-provider-firms
+  let liquidity-ratio (liquidity-h / average-goods-price-of-provider-firms)
   set planned-monthly-consumption-expenditure (min (list (liquidity-ratio ^ planned-consumption-increase-decaying-rate) liquidity-ratio))
 end
 
@@ -524,7 +524,7 @@ to transact-with-provider-firm [n-tries planned-daily-consumption-demand]
            ]
          ]
          [                         
-           let adjusted-daily-consumption-demand chosen-provider-firm-inventory
+           let adjusted-daily-consumption-demand (chosen-provider-firm-inventory)
            
            let chosen-provider-firm-unsatisfied-demand (daily-unsatisfied-satisfied-demand - chosen-provider-firm-inventory)
            let chosen-provider-firm-who ([who] of chosen-provider-firm)
@@ -1175,6 +1175,116 @@ MONITOR
 384
 mean-num-providers
 mean [count my-out-provider-firms] of households
+17
+1
+11
+
+MONITOR
+1368
+352
+1509
+397
+firms-with-nil-inventory
+count firms with [inventory-f = 0]
+17
+1
+11
+
+MONITOR
+1515
+352
+1670
+397
+firms-with-fired-employee
+count firms with [fired-employee != nobody]
+17
+1
+11
+
+MONITOR
+1673
+351
+1827
+396
+firms-could-fire-employee
+count firms with [inventory-f > inventory-upper-limit]
+17
+1
+11
+
+MONITOR
+1369
+406
+1518
+451
+firms-with-no-employees
+count firms with [(count my-in-employees) = 0]
+17
+1
+11
+
+MONITOR
+1522
+407
+1593
+452
+small-firms
+count firms with [(count my-in-employees) > 0 and (count my-in-employees) < 5]
+17
+1
+11
+
+MONITOR
+1597
+407
+1683
+452
+medium-firms
+count firms with [(count my-in-employees) > 5 and (count my-in-employees) <= 20]
+17
+1
+11
+
+MONITOR
+1708
+406
+1768
+451
+big-firms
+count firms with [(count my-in-employees) > 20]
+17
+1
+11
+
+MONITOR
+1522
+458
+1601
+503
+small-firm-w
+mean [wage-rate-f] of firms with [(count my-in-employees) > 0 and (count my-in-employees) < 5]
+17
+1
+11
+
+MONITOR
+1605
+458
+1705
+503
+medium-firms-w
+mean [wage-rate-f] of firms with [(count my-in-employees) > 5 and (count my-in-employees) <= 20]
+17
+1
+11
+
+MONITOR
+1710
+457
+1784
+502
+big-firms-w
+mean [wage-rate-f] of firms with [(count my-in-employees) > 20]
 17
 1
 11
